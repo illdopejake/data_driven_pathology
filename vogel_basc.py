@@ -52,7 +52,7 @@ import nibabel as ni
 from sklearn import cluster
 import itertools
 
-def poormans_basc(in_mtx,n_clust,n_iter,checker,return_mtx = False):
+def poormans_basc(in_mtx,n_clust,n_iter,checker,return_mtx = False, plotit=True):
     clust_mtx = pandas.DataFrame(index=in_mtx.index)
     print('running cluster analyses')
     for i in range(n_iter):
@@ -73,11 +73,12 @@ def poormans_basc(in_mtx,n_clust,n_iter,checker,return_mtx = False):
     stab_mtx[np.tril_indices_from(stab_mtx)] = stab_mtx.transpose()[
                                             np.tril_indices_from(stab_mtx)]
     
-    plt.close
-    sns.clustermap(stab_mtx)
-    plt.show()
+    if plotit:
+        plt.close()
+        sns.clustermap(stab_mtx)
+        plt.show()
     
-    aggclust = cluster.AgglomerativeClustering(6,connectivity=stab_mtx).fit(stab_mtx)
+    aggclust = cluster.AgglomerativeClustering(n_clust,connectivity=stab_mtx).fit(stab_mtx)
     if not return_mtx:
         return aggclust.labels_, stab_mtx
     else:
