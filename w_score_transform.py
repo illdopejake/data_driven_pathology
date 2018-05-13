@@ -240,7 +240,7 @@ def w_transform(beta_imgs, int_img, raw_paths, sdres_img,
 
 if __name__ == '__main__':
 
-    main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'beta',
-                           intercept='first', res_str = 'Res_', 
-                          cols_to_use = [], img_mask = None, subject_col = '',
-                          memory_load = 'low')
+    main(image_dir, beta_dir, spreadsheet, outdir, sdres_img, beta_str,
+                           intercept, res_str, 
+                          cols_to_use , img_mask, subject_col,
+                          memory_load)
