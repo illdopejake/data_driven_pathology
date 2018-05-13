@@ -25,8 +25,8 @@ from glob import glob
 
 def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'beta',
                            intercept='first', res_str = 'Res_', 
-                          cols_to_use = [], img_mask = None, subject_col = '',
-                          memory_load = 'low'):
+                          cols_to_use = [], img_mask = None, subject_col = ''
+                          ):
     '''This script will create W-SCORE images from a set of input images, and a
     spreadsheet. This script makes several assumptions about the inputs:
     
@@ -35,15 +35,16 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
     2) The rows of your spreadsheet MUST be in the exact same order as the images 
         in the "image_dir directory. So subject 1 should be row 1 of the spreadsheet 
         (not including headers)
-    3) The script assumes you have run an SPM model for the variables included in 
+    3) The values in the dataframe should all be of a numeric type (int or float)
+    4) The script assumes you have run an SPM model for the variables included in 
         the W-SCORE, and that you thus have BETA images for each of those variables
-    4) The number of BETA images (not including the intercept) should be in the exact 
+    5) The number of BETA images (not including the intercept) should be in the exact 
         same order as either the columns of your spreadsheet, or the columns in the
         cols_to_use argument.
-    5) If cols_to_use is not passed, script assumes that spreadsheet only includes 
+    6) If cols_to_use is not passed, script assumes that spreadsheet only includes 
         columns for which BETA images exist, as well as a subject column (but only
         if the subject_col argument is passed)
-    6) The script assumes you either have an image representing the Standard
+    7) The script assumes you either have an image representing the Standard
         Deviation of the Residuals, or you have asked SPM to create the residuals in 
         the model described in 3)
     
@@ -65,6 +66,7 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
         intercept in the model, pass "none". (WARNING, "none" is in beta and will crash)
     res_str = if you did not pass an option for sdres_img, you must an argument here. This
         is the string labels of Residual images created by the SPM model.
+        **WARNING** This may crash your computer if you don't have sufficient memory
     cols_to_use = a list of columns from df to use can be specified here. If your df has 
         columns you do not wish to use in the w-scoring, you can specify the names of the
         columns you do wish to use (be sure they are in the exact same order as the beta
@@ -73,10 +75,6 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
         passed, the w-score images will be masked (RECOMMENDED)
     subject_col = name of a column in df with the subject IDs. This will automatically label
         the w-score images with the subject IDs from this columns
-    memory_load = Only relevant if sdres_img is not passed. If you are using a computer with
-        a lot of memory, change this to "high" to speed up the creation of the sdres_img. 
-        However, this may crash your computer if you do not have enough memory storage. If
-        you're unsure, leave it as low.
     
     '''
     
@@ -98,7 +96,7 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
         raise IOError('intercept must be set to "first", "last" or "none". See docstring for more info')
     
     # load inputs
-    raw_paths = glob(os.path.join(image_dir,'*'))
+    raw_paths = glob(os.path.join(image_dir,'*.ni*'))
     print('found %s images to transform'%len(raw_paths))
     
     beta_paths = glob(os.path.join(beta_dir,'%s*'%beta_str))
@@ -115,7 +113,7 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
                                                                                             n_betas))
 
     print('preparing spreadsheet')
-    if type(spreadsheet) = str
+    if type(spreadsheet) == str:
         if '.csv' in spreadsheet:
             df = pandas.read_csv(spreadsheet)
         elif 'xl' in spreadsheet[-4:]:
@@ -130,7 +128,7 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
             except:
                 raise IOError('could not read spreadsheet. Try loading the df yourself with pandas and inputting that')
     else:
-        df = spreadsheet
+        df = pandas.DataFrame(spreadsheet,copy=True)
     if subject_col:
         if type(subject_col) == int:
             subject_col = df.columns[subject_col]
@@ -148,7 +146,7 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
     if len(cols_to_use) > 0:
         df = df[cols_to_use]
     if df.shape[0] != len(raw_paths):
-        raise IOError('number of scans (n=) does not match number of rows in spreadsheet (n=)'%(len(raw_paths),
+        raise IOError('number of scans (n=%s) does not match number of rows in spreadsheet (n=%s)'%(len(raw_paths),
                                                                                                df.shape[0]))
     
     print('loading beta images')
@@ -171,7 +169,7 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
         except:
             raise IOError('shape of beta images is %s, expecting a set of 3D images (so 4d)'%beta_imags.shape)
     
-    if ni.load(beta_imgs[:,:,:,0]).shape != ni.load(raw_paths[0]).shape:
+    if beta_imgs[:,:,:,0].shape != ni.load(raw_paths[0]).shape:
         raise IOError('inconsistent dimensions between betas and raw images')
     
     if sdres_img:
@@ -180,38 +178,32 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
         else:
             raise IOError('could not find any SD of residual images at path %s'%sdres)
     else:
-        sdres_img = create_sdres_img(res_paths, res_str, beta_dir, memory_load)
+        sdres_img = create_sdres_img(res_str, beta_dir)
     
-    if type(image_mask) != type(None):
+    if type(img_mask) != type(None):
         try:
-            mask = ni.load(image_mask).get_data()
+            mask = ni.load(img_mask).get_data()
         except:
             raise IOError('could not load mask. Please ensure the path points to an existing nifti image')
         if mask.shape != ni.load(raw_paths[0]).shape:
-            raise IOError('dimensions of mask do not match the dimensions of input images')
+            raise IOError('dimensions of mask (%s) do not match the dimensions of input images (%s)'%(mask.shape,
+                                                                                                   ni.load(raw_paths[0]).shape))
     else:
         mask = None
     
-    w_transform(beta_imgs, int_img, raw_paths, res_paths, sdres_img, 
+    w_transform(beta_imgs, int_img, raw_paths,  sdres_img, 
                 df, subject_IDs, aff, mask, outdir)
     
     print('FINISHED! W-SCORE images written to %s'%outdir)
     
-def create_sdres_img(res_paths, res_str, beta_dir, memory_load):
+def create_sdres_img(res_str, beta_dir):
     
     res_paths = glob(os.path.join(beta_dir,'%s*'%res_str))
     print('calculating standard deviation of the residuals')
-    if memory_load == 'high':
-        print('loading res images...')
-        res_imgs = ni.concat_images(res_paths).get_data()
-        print('calculating...')
-        sdres_img = res_imgs.std(ddof=1,axis=3)
-    else:
-        sdres_img = ni.load(res_paths[0]).get_data()
-        for img in res_paths[1:]:
-            jnk = ni.load(img).get_data()
-            sdres_img += jnk
-        sdres_img = np.divide(sdres_img, len(res_paths))
+    print('loading res images...')
+    res_imgs = ni.concat_images(res_paths).get_data()
+    print('calculating...')
+    sdres_img = res_imgs.std(ddof=1,axis=3)
     
     return sdres_img
     
@@ -219,8 +211,7 @@ def w_transform(beta_imgs, int_img, raw_paths, sdres_img,
                 df, subject_IDs, aff, mask, outdir):
         
     print('performing w-score transformations...')
-    df.index = range(len(df.shape[0]))
-    x,y,z = ni.load(beta_imgs[0]).shape
+    x,y,z = ni.load(raw_paths[0]).shape
     for i,scan in enumerate(raw_paths):
         if len(subject_IDs) > 0:
             sid = subject_IDs[i]
@@ -228,21 +219,23 @@ def w_transform(beta_imgs, int_img, raw_paths, sdres_img,
             sid = os.path.split(scan).split('.')[0]
         coefs = []
         if type(int_img) != type(None):
-            coefs.append(int_img)
+            coefs.append(int_img.reshape(x,y,z,1))
         for j,col in enumerate(df.columns):
-            val = df.loc[i,col]
-            coef = np.multiply(beta_imgs[:,:,:,j],val)
+            val = df.loc[df.index[i],col]
+            val_img = np.full_like(beta_imgs[:,:,:,j],val) 
+            coef = beta_imgs[:,:,:,j] * val_img
+            #coef = np.multiply(beta_imgs[:,:,:,j],val)
             coefs.append(coef.reshape(x,y,z,1))
         jnk = np.concatenate(coefs,axis=3)
         predicted = jnk.sum(axis=3)
         observed = ni.load(scan).get_data()
         wscr_mat = (observed - predicted) / sdres_img
         if type(mask) != type(None):
-            wscr_mat[msk==0] = 0
+            wscr_mat[mask==0] = 0
         wscr_img = ni.Nifti1Image(wscr_mat,aff)
-        flnm = os.path.join(outdir,'WSCORE_%s'%(sid)
-        wscr_img.to_filename(flnm))
-        print('finished %s, %s of %s'%(sid,i+1,len(scans)))
+        flnm = os.path.join(outdir,'WSCORE_%s'%(sid))
+        wscr_img.to_filename(flnm)
+        print('finished %s, %s of %s'%(sid,i+1,len(raw_paths)))
 
 
 if __name__ == '__main__':
