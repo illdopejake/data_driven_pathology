@@ -26,7 +26,7 @@ from glob import glob
 def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'beta',
                            intercept='first', res_str = 'Res_', 
                           cols_to_use = [], img_mask = None, subject_col = ''
-                          ):
+                          memory_load = 'low'):
     '''This script will create W-SCORE images from a set of input images, and a
     spreadsheet. This script makes several assumptions about the inputs:
     
@@ -92,7 +92,7 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
     if not os.path.isdir(outdir):
         os.mkdir(outdir)
     
-    if intercept not in ['first','last', 'none']:
+    if intercept not in ['first','last', 'none', 'auto']:
         raise IOError('intercept must be set to "first", "last" or "none". See docstring for more info')
     
     # load inputs
@@ -102,7 +102,7 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
     beta_paths = glob(os.path.join(beta_dir,'%s*'%beta_str))
     if len(beta_paths) == 0:
         raise IOError('No beta images found in specified directory. Please revise beta_dir or beta_str arguments')
-    if intercept == 'none':
+    if intercept == 'none' or 'auto':
         n_betas = len(beta_paths)
     else:
         n_betas = len(beta_paths) - 1
@@ -156,6 +156,8 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
     elif intercept == 'last':
         int_img = ni.load(beta_paths[-1]).get_data()
         beta_paths.remove(beta_paths[-1])
+    elif intercept == 'auto':
+        int_img = create_mean_img(raw_paths, memory_load)
     else:
         int_img = None
     jnk = ni.concat_images(beta_paths)
@@ -199,13 +201,32 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
 def create_sdres_img(res_str, beta_dir):
     
     res_paths = glob(os.path.join(beta_dir,'%s*'%res_str))
-    print('calculating standard deviation of the residuals')
+    print('calculating mean image')
     print('loading res images...')
     res_imgs = ni.concat_images(res_paths).get_data()
     print('calculating...')
     sdres_img = res_imgs.std(ddof=1,axis=3)
     
     return sdres_img
+
+def create_mean_img(raw_paths, memory_load):
+    
+    print('calculating standard deviation of the residuals')
+    if memory_load == 'high':
+        print('loading res images...')
+        imgs = ni.concat_images(raw_paths).get_data()
+        print('calculating...')
+        mean_img = res_imgs.mean()
+    else:
+        mean_img = ni.load(raw_paths[0]).get_data()
+        for path in raw_paths[1:]:
+            img = ni.load(path).get_data()
+            mean_img += img
+        divisor = np.full_like(mean_img,len(raw_paths))
+        mean_img = mean_img/divisor
+
+    
+    return mean_img
     
 def w_transform(beta_imgs, int_img, raw_paths, sdres_img, 
                 df, subject_IDs, aff, mask, outdir):
@@ -224,7 +245,7 @@ def w_transform(beta_imgs, int_img, raw_paths, sdres_img,
             val = df.loc[df.index[i],col]
             val_img = np.full_like(beta_imgs[:,:,:,j],val) 
             coef = beta_imgs[:,:,:,j] * val_img
-            #coef = np.multiply(beta_imgs[:,:,:,j],val)
+            #coef = np.multiply(beta_imgs[:,:,:,j],val)bi
             coefs.append(coef.reshape(x,y,z,1))
         jnk = np.concatenate(coefs,axis=3)
         predicted = jnk.sum(axis=3)
