@@ -25,7 +25,7 @@ from glob import glob
 
 def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'beta',
                            intercept='first', res_str = 'Res_', 
-                          cols_to_use = [], img_mask = None, subject_col = ''
+                          cols_to_use = [], img_mask = None, subject_col = '',
                           memory_load = 'low'):
     '''This script will create W-SCORE images from a set of input images, and a
     spreadsheet. This script makes several assumptions about the inputs:
@@ -198,20 +198,32 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
     
     print('FINISHED! W-SCORE images written to %s'%outdir)
     
-def create_sdres_img(res_str, beta_dir):
+def create_sdres_img(res_str, beta_dir, memory_load):
     
+    print('calculating standard deviation of the residuals')
     res_paths = glob(os.path.join(beta_dir,'%s*'%res_str))
-    print('calculating mean image')
-    print('loading res images...')
-    res_imgs = ni.concat_images(res_paths).get_data()
-    print('calculating...')
-    sdres_img = res_imgs.std(ddof=1,axis=3)
+    if memory_load == 'high':
+        print('loading res images...')
+        res_imgs = ni.concat_images(res_paths).get_data()
+        print('calculating...')
+        sdres_img = res_imgs.std(ddof=1,axis=3)
+    else:
+        mean_img = create_mean_img(res_paths, 'low')
+        jnk = ni.load(res_paths[0]).get_data()
+        holder = jnk - mean_img
+        print('calculating variance...')
+        for path in res_paths[1:]:
+            jnk = ni.load(path).get_data()
+            holder += (jnk - mean_img)
+        holder = holder**2
+        var = holder / np.full_like(holder,len(res_paths))
+
     
     return sdres_img
 
 def create_mean_img(raw_paths, memory_load):
     
-    print('calculating standard deviation of the residuals')
+    print('calculating mean image')
     if memory_load == 'high':
         print('loading res images...')
         imgs = ni.concat_images(raw_paths).get_data()

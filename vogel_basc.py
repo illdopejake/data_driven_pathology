@@ -82,7 +82,7 @@ def poormans_basc(in_mtx,n_clust,n_iter,checker,return_mtx = False, plotit=True)
     if not return_mtx:
         return aggclust.labels_, stab_mtx
     else:
-        newdf = deepcopy(in_mtx)
+        newdf = pandas.DataFrame(in_mtx, copy=True)
         newdf.ix[:,'order'] = aggclust.labels_
     
         return stab_mtx, newdf
