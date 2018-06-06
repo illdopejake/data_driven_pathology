@@ -637,7 +637,7 @@ def Plot_Probabilites(prob_matrix):
     sorter2.loc['mean'] = prob_matrix.mean(axis=0)
     forplot = prob_matrix.loc[sorter.sort_values('mean',axis=0,ascending=True).index
                         ][sorter2.sort_values('mean',axis=1,ascending=False).columns]
-    sns.heatmap(forplot.values)
+    sns.heatmap(forplot)
     plt.xlabel('Regions (highest - lowest p)')
     plt.ylabel('Subjects (lowest - highest p)')
     plt.show()
