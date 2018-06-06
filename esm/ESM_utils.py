@@ -634,7 +634,7 @@ def Plot_Probabilites(prob_matrix):
     sorter = pandas.DataFrame(prob_matrix,copy=True)
     sorter.loc[:,'mean'] = prob_matrix.mean(axis=1)
     sorter2 = pandas.DataFrame(prob_matrix,copy=True)
-    sorter2.loc['mean',:] = prob_matrix.mean(axis=0)
+    sorter2.loc['mean'] = prob_matrix.mean(axis=0)
     forplot = prob_matrix.loc[sorter.sort_values('mean',axis=0,ascending=True).index
                         ][sorter2.sort_values('mean',axis=1,ascending=False).columns]
     sns.heatmap(forplot.values)
