@@ -623,7 +623,8 @@ def Plot_Probabilites(prob_matrix):
     a heatmap of all probability values sorted in such a manner to demonstrate
     a progression of values.
     '''
-    
+    ## NOTE TO SELF: ADD ARGUMENT FOR FIGSIZE AND THRESHOLDING HEATMAP
+
     if type(prob_matrix) == np.ndarray:
         prob_matrix = pandas.DataFrame(prob_matrix)
         
@@ -819,12 +820,14 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
             raise ValueError('equal length lists must be passed for all three conn_mat arguments')
         for i,mtx in enumerate(conn_matrices):
             if mtx[-3:] == 'csv':
-                pandas.read_csv(mtx)
+                connmat = pandas.read_csv(mtx)
+                jnk = {}
             elif mtx[-3:] == 'mat':
-                connmat = loadmat(mtx)[conn_mat_names[i]]
+                jnk = loadmat(mtx)
+                connmat = jnk[conn_mat_names[i]]
             newmat = np.array([thing[goodcols] for thing in connmat[goodcols]])
-            connmat[file_name] = newmat
-            savemat(os.path.join(output_dir,conn_out_names[i]), connmat)
+            jnk[file_name] = newmat
+            savemat(os.path.join(output_dir,conn_out_names[i]), jnk)
             print('new connecitity matrix size: for %s'%conn_out_names[i],newmat.shape)
             if figure:
                 plt.close()
@@ -843,8 +846,8 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
     for x in prob_matrices.keys():
         print(x)
     if len(conn_matrices) > 0:
+    	print('===connectivity matrices===')
         for i in range(len(conn_matrices)):
-            print('===connectivity matrices===')
             print(os.path.join(output_dir,conn_out_names[i]), conn_mat_names[i])
 
 def Evaluate_ESM_Results(results, sids, save=True, 
