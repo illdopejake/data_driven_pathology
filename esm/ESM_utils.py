@@ -439,7 +439,7 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
                 raise IOError('roi_matrix type not recognized. Pass pandas DataFrame or np.ndarray')
         if norm_matrix.shape[-1] != roi_matrix.shape[-1]:
             raise IOError('norm_matrix must have the same number of columns as roi_matrix')
-        elif norm_matrix.columns != roi_matrix.columns:
+        elif all(norm_matrix.columns != roi_matrix.columns):
             raise IOError('norm_matrix must have the same column labels as roi_matrix')
     else:
         norm_matrix = pandas.DataFrame(roi_matrix, copy=True)
@@ -492,7 +492,7 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
         return results, final_report
     
 def ecdf_tfm(target_col, norm_col):
-    return ed.ECDF(target_col.values)(norm_col.values)
+    return ed.ECDF(norm_col.values)(target_col.values)
 
 def model_tfm(target_col, norm_col, models, target_distribution, fail_behavior):
     
@@ -846,9 +846,9 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
     for x in prob_matrices.keys():
         print(x)
     if len(conn_matrices) > 0:
-    	print('===connectivity matrices===')
+        print('===connectivity matrices===')
         for i in range(len(conn_matrices)):
-            print(os.path.join(output_dir,conn_out_names[i]), conn_mat_names[i])
+            print(os.path.join(output_dir,conn_out_names[i]), conn_out_names[i])
 
 def Evaluate_ESM_Results(results, sids, save=True, 
                          labels = None, lit = False, plot = True):
