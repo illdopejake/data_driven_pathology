@@ -970,7 +970,7 @@ def Plot_ESM_results(mat, labels, subids, lit):
                                     ], axis = 1))
     fp.columns = ['reference','predicted']
     if labels:
-        fp.loc[:,'labels'] = labs.label
+        fp.loc[:,'labels'] = labels
     sheets.update({'regional accuracy': fp})
     
     
