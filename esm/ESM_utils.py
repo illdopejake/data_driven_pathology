@@ -624,6 +624,7 @@ def Plot_Probabilites(prob_matrix):
     a progression of values.
     '''
     ## NOTE TO SELF: ADD ARGUMENT FOR FIGSIZE AND THRESHOLDING HEATMAP
+    ## ALSO ARGUMENT TO SORT BY DIFFERENT COLUMNS OR ROWS
 
     if type(prob_matrix) == np.ndarray:
         prob_matrix = pandas.DataFrame(prob_matrix)
@@ -821,6 +822,10 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
         for i,mtx in enumerate(conn_matrices):
             if mtx[-3:] == 'csv':
                 connmat = pandas.read_csv(mtx)
+                if all(connmat.loc[:,connmat.columns[0]] == range(connmat.shape[0])):
+                	connmat = pandas.read_csv(mtx, index_col=0).values
+                else:
+                	connmat = connmat.values
                 jnk = {}
             elif mtx[-3:] == 'mat':
                 jnk = loadmat(mtx)
