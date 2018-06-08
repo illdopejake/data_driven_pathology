@@ -969,7 +969,7 @@ def Plot_ESM_results(mat, labels, subids, lit):
                                      pandas.Series(mat['model_solutions0'].mean(1))
                                     ], axis = 1))
     fp.columns = ['reference','predicted']
-    if labels:
+    if type(labels) != type(None):
         fp.loc[:,'labels'] = labels
     sheets.update({'regional accuracy': fp})
     
