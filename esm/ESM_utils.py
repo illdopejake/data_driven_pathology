@@ -836,8 +836,12 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
             print('new connecitity matrix size: for %s'%conn_out_names[i],newmat.shape)
             if figure:
                 plt.close()
-                sns.heatmap(newmat)
-                plt.show()
+                try:
+                	sns.heatmap(newmat)
+                	plt.show()
+                except:
+                	sns.heatmap(newmat.astype(float))
+                	plt.show()
 
     if type(ages) == np.ndarray or type(ages) == list:
         ages = pandas.Series(ages)
