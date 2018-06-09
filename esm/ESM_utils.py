@@ -617,7 +617,8 @@ def Evaluate_Model(roi, models, bins=None):
         plt.title(label)
         plt.show()
 
-def Plot_Probabilites(prob_matrix):
+def Plot_Probabilites(prob_matrix, col_order = [], ind_order = [], 
+					  vmin=None, vmax=None, figsize=()):
     '''
     Given the output matrix of Convert_ROI_values_to_Probabilities, will plot
     a heatmap of all probability values sorted in such a manner to demonstrate
@@ -628,19 +629,27 @@ def Plot_Probabilites(prob_matrix):
 
     if type(prob_matrix) == np.ndarray:
         prob_matrix = pandas.DataFrame(prob_matrix)
-        
+    
+    if len(figsize) == 0:
+    	figsize = (14,6)
+    elif len(figsize) > 2:
+    	raise IOError('figsize must be a tuple with two values (x and y)')
+
     good_cols = [x for x in prob_matrix.columns if not all([x==0 for x in prob_matrix[x]])] 
     prob_matrix = prob_matrix[good_cols]
     
     plt.close()
-    sorter = pandas.DataFrame(prob_matrix,copy=True)
-    sorter.loc[:,'mean'] = prob_matrix.mean(axis=1)
-    sorter2 = pandas.DataFrame(prob_matrix,copy=True)
-    sorter2.loc['mean'] = prob_matrix.mean(axis=0)
-    fig, ax = plt.subplots(figsize=(14,6)) # should be made into an argument)
-    forplot = prob_matrix.loc[sorter.sort_values('mean',axis=0,ascending=True).index
-                        ][sorter2.sort_values('mean',axis=1,ascending=False).columns]
-    sns.heatmap(forplot)
+    if len(ind_order) == 0:
+    	sorter = pandas.DataFrame(prob_matrix,copy=True)
+    	sorter.loc[:,'mean'] = prob_matrix.mean(axis=1)
+    	ind_order = sorter.sort_values('mean',axis=0,ascending=True).index
+    if len(col_order) == 0:
+    	sorter2 = pandas.DataFrame(prob_matrix,copy=True)
+    	sorter2.loc['mean'] = prob_matrix.mean(axis=0)
+    	col_order = sorter2.sort_values('mean',axis=1,ascending=False).columns
+    fig, ax = plt.subplots(figsize=figsize) 
+    forplot = prob_matrix.loc[ind_order, col_order]
+    sns.heatmap(forplot, vmin, vmax)
     plt.xlabel('Regions (highest - lowest p)')
     plt.ylabel('Subjects (lowest - highest p)')
     plt.show()
