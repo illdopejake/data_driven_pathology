@@ -827,12 +827,18 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
     
     if len(conn_matrices) > 0:
         if not len(conn_matrices) == len(conn_out_names):
-            raise ValueError('equal length lists must be passed for all three conn_mat arguments')
+            raise ValueError('equal length lists must be passed for conn_matrices and out_names')
         for i,mtx in enumerate(conn_matrices):
             if mtx[-3:] == 'csv':
                 connmat = pandas.read_csv(mtx)
+                x,y = connmat.shape
+                if x < y:
+                	connmat = pandas.read_csv(mtx,header=None)
                 if all(connmat.loc[:,connmat.columns[0]] == range(connmat.shape[0])):
                 	connmat = pandas.read_csv(mtx, index_col=0).values
+                	x,y = connmat.shape
+                	if x < y:
+                		connmat = pandas.read_csv(mtx, index_col=0, header=None).values
                 else:
                 	connmat = connmat.values
                 jnk = {}
