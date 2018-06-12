@@ -923,12 +923,19 @@ def Evaluate_ESM_Results(results, sids, save=True,
         print('average eval =', res.model_eval.mean())
 
         if type(labels) != type(None):
-            print('model identfied the following epicenters')
-            for l in mat['models'][0,0][0][0]:
-                print(labels.iloc[l-1]['label'])
+        	if type(labels) == np.ndarray or type(labels) == list:
+        		labels = pandas.Series(labels)
+        	print('model identfied the following epicenters')
+        	for l in mat['models'][0,0][0][0]:
+        		print(labels.loc[labels.index[l-1]])
+
+        if plot:
+            plot_out = Plot_ESM_results(mat, labels, sids, lit)
 
         if save:
-            return res
+        	if plot:
+        		res = {'model_output': res, 'eval_output': plot_out}
+        	return res
         
     else:
         res = pandas.DataFrame(index = sids)
@@ -972,7 +979,7 @@ def Evaluate_ESM_Results(results, sids, save=True,
 def Plot_ESM_results(mat, labels, subids, lit):
     
     if not lit:
-        mat.update({'model_solutions0': mat['model_solutions']})
+        mat.update({'model_solutions0': mat['Final_solutions']})
     sheets = {}
     # regional accuracy across subjects
     plt.close()
