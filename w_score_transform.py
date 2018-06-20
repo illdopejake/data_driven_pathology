@@ -210,14 +210,13 @@ def create_sdres_img(res_str, beta_dir, memory_load):
     else:
         mean_img = create_mean_img(res_paths, 'low')
         jnk = ni.load(res_paths[0]).get_data()
-        holder = jnk - mean_img
+        sosd = jnk - mean_img
         print('calculating variance...')
         for path in res_paths[1:]:
             jnk = ni.load(path).get_data()
-            holder += (jnk - mean_img)
-        holder = holder**2
-        var = holder / np.full_like(holder,len(res_paths))
-
+            sosd += (jnk - mean_img)**2
+        var = sosd / np.full_like(var,len(res_paths))
+        sdres_img = math.sqrt()
     
     return sdres_img
 
@@ -249,7 +248,7 @@ def w_transform(beta_imgs, int_img, raw_paths, sdres_img,
         if len(subject_IDs) > 0:
             sid = subject_IDs[i]
         else:
-            sid = os.path.split(scan).split('.')[0]
+            sid = os.path.split(scan)[-1].split('.')[0]
         coefs = []
         if type(int_img) != type(None):
             coefs.append(int_img.reshape(x,y,z,1))
