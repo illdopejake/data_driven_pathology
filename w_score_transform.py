@@ -1,8 +1,3 @@
-import os
-import pandas
-import numpy as np
-import nibabel as ni
-from glob import glob
 
 # IF RUNNING THIS FROM THE COMMAND-LINE (i.e. not directly from an interpreter), 
 # UN-COMMENT THE FOLLOWING LINES AND FILL IN THE VARIABLES. (SEE DOCUMENTATION
@@ -96,10 +91,10 @@ def main(image_dir, beta_dir, spreadsheet, outdir, sdres_img = '', beta_str = 'b
         raise IOError('intercept must be set to "first", "last" or "none". See docstring for more info')
     
     # load inputs
-    raw_paths = glob(os.path.join(image_dir,'*.ni*'))
+    raw_paths = sorted(glob(os.path.join(image_dir,'*.ni*')))
     print('found %s images to transform'%len(raw_paths))
     
-    beta_paths = glob(os.path.join(beta_dir,'%s*'%beta_str))
+    beta_paths = sorted(glob(os.path.join(beta_dir,'%s*'%beta_str)))
     if len(beta_paths) == 0:
         raise IOError('No beta images found in specified directory. Please revise beta_dir or beta_str arguments')
     if intercept == 'none' or 'auto':
