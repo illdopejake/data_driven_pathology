@@ -455,6 +455,8 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
         for col in roi_matrix.columns:
             if not all([x==0 for x in roi_matrix[col]]):
                 results.loc[:,col] = ecdf_tfm(roi_matrix[col], norm_matrix[col])
+                if target_distribution == 'left':
+                    results.loc[:,col] = (1 - results.loc[:,col].values)
                 final_report = None
             else:
                 results.loc[:,col] = [0 for x in range(len(roi_matrix[col]))]
