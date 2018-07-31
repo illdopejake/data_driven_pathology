@@ -425,15 +425,21 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
     if fail_behavior not in ['nan', 'values']:
         raise IOError('fail_behavior must be set to "nan" or "values"')
     
+    if type(roi_matrix) == pandas.core.frame.DataFrame:
+        roi_matrix = pandas.DataFrame(roi_matrix,copy=True)
     if type(roi_matrix) != pandas.core.frame.DataFrame:
         if type(roi_matrix) == np.ndarray:
+            roi_matrix = np.array(roi_matrix,copy=True)
             roi_matrix = pandas.DataFrame(roi_matrix)
         else:
             raise IOError('roi_matrix type not recognized. Pass pandas DataFrame or np.ndarray')
     
     if type(norm_matrix) != type(None):
+        if type(norm_matrix) == pandas.core.frame.DataFrame:
+            norm_matrix = pandas.DataFrame(norm_matrix,copy=True)
         if type(norm_matrix) != pandas.core.frame.DataFrame:
             if type(norm_matrix) == np.ndarray:
+                norm_matrix = np.array(norm_matrix,copy=True)
                 norm_matrix = pandas.DataFrame(norm_matrix)
             else:
                 raise IOError('roi_matrix type not recognized. Pass pandas DataFrame or np.ndarray')
