@@ -52,13 +52,18 @@ import nibabel as ni
 from sklearn import cluster
 import itertools
 
-def poormans_basc(in_mtx,n_clust,n_iter,checker,return_mtx = False, plotit=True):
+def poormans_basc(in_mtx,n_clust,n_iter,checker,
+                  inner_cluster_object = None,
+                  return_mtx = False, plotit = True):
+    
     clust_mtx = pandas.DataFrame(index=in_mtx.index)
     print('running cluster analyses')
+    if type(inner_cluster_object) == type(None):
+        inner_cluster_object = cluster.KMeans(n_clust)
     for i in range(n_iter):
         if i%checker == 0:
             print('working on iteration',i)
-        clust_mtx.ix[:,'i%s'%i] = cluster.k_means(in_mtx,n_clust)[1]
+        clust_mtx.ix[:,'i%s'%i] = inner_cluster_object.fit(in_mtx).labels_
     print('creating stability matrix')
     id_mtx = np.zeros((len(clust_mtx),len(clust_mtx)))
     for i in range(n_iter):

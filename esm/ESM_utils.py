@@ -370,7 +370,8 @@ def fix_atlas(atl):
 def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
                                         models = None,
                                         target_distribution = 'right',
-                                        outdir = False, fail_behavior = 'nan'):
+                                        outdir = False, fail_behavior = 'nan',
+                                        mixed_probability = False, mp_thresh = 0.05):
     '''
     Will take a Subject x ROI array of values and convert them to probabilities,
     using ECDF (monomial distribution) or Gaussian Mixture models (binomial
@@ -416,6 +417,14 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
         'nan' will return NaNs for all ROIs that fail
         'values' will return probability values from one the distributions (selected
         arbitrarily)
+        
+    mixed_probability -- Experimental setting. If set to True, after calculating
+    probabilities, for rois with n_components > 1 only, will set all values < 
+    mp_thresh to 0. Remaining values will be put through ECDF. This will create less
+    of a binarized distribution for n_components > 1 ROIs.
+    
+    mp_thresh -- Threshold setting for mixed_probability. Must be a float between 0
+    and 1. Decides the arbitrary probability of "tau positivity". Default is 0.05.
     
     '''
 
@@ -433,6 +442,9 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
             roi_matrix = pandas.DataFrame(roi_matrix)
         else:
             raise IOError('roi_matrix type not recognized. Pass pandas DataFrame or np.ndarray')
+    
+    if mixed_probability:
+        holdout_mtx = pandas.DataFrame(roi_matrix, copy=True)
     
     if type(norm_matrix) != type(None):
         if type(norm_matrix) == pandas.core.frame.DataFrame:
@@ -488,6 +500,9 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
             print('%s ROIs showed unexpected fitting behavior. See report...'%fails)
     else:
         raise ValueError('models must be a dict object or must be set to "ecdf". You passed a %s'%(type(models)))
+    
+    if mixed_probability:
+        results = mixed_probability_transform(results, holdout_mtx, mp_thresh, final_report)
     
     if type(final_report) == type(None):
         if outdir:
@@ -567,7 +582,7 @@ def model_tfm(target_col, norm_col, models, target_distribution, fail_behavior):
                 
                 
     return tfm, report
-                
+
 def compare_models(models, norm_col):
     modz = []
     labs = []
@@ -584,6 +599,20 @@ def compare_models(models, norm_col):
     winning_label = labs[winner_id]
     
     return winning_mod, winning_label
+
+def mixed_probability_transform(p_matrix, original_matrix, mp_thresh, report):
+    for col in original_matrix.columns:
+        if report.loc[col,'n_components'] == 2:
+            newcol = pandas.Series(
+                    [0 if p_matrix.loc[x, col] < mp_thresh else original_matrix.loc[x,col] for x in original_matrix.index]
+                                  )
+            if len(newcol[newcol>0]) > 0:
+                newcol[newcol>0] = ecdf_tfm(newcol[newcol>0], newcol[newcol>0])
+
+            p_matrix.loc[:,col] = newcol
+    
+    return p_matrix
+        
 
 def Evaluate_Model(roi, models, bins=None):
     '''
