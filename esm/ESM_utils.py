@@ -1449,4 +1449,103 @@ def generate_matrix_from_atlas_old(files_in, atlas):
     return f_mat
 
 
+def W_Transform(roi_matrix, covariates, norm_index = [], 
+                columns = [], verbose = False):
+    
+    '''
+    Depending on inputs, this function will either regress selected 
+    variables out of an roi_matrix, or will perform a W-transform on an 
+    roi_matrix.
+    
+    W-transform is represented as such:
+    
+    (Pc - A) / SDrc
+    
+    Where Pc is the predicted value of the roi *based on the covariates 
+    of the norm sample*; A = actual value of the roi; SDrc = standard 
+    deviation of the residuals *or the norm sample*
+    
+    roi_matrix = a subjects x ROI array
+    
+    covariates = a subject x covariates array
+    
+    norm_index = index pointing exclusively to subjects to be used for
+    normalization. If norm index is passed, W-transformation will be 
+    performed using these subjects as the norm_sample (see equation 
+    above). If no norm_index is passed, covariates will simply be
+    regressed out of all ROIs.
+    
+    columns = the columns to use fron the covariate matrix. If none, 
+    all columns if the covariate matrix will be used.
+    
+    verbose = If True, will notify upon the completion of each ROI
+    transformation.
+    '''
+    
+    if type(roi_matrix) != pandas.core.frame.DataFrame:
+        raise IOError('roi_matrix must be a subjects x ROIs pandas DataFrame')
+    if type(covariates) != pandas.core.frame.DataFrame:
+        raise IOError('covariates must be a subjects x covariates pandas DataFrame')
+    
+    covariates = clean_time(covariates)
+    roi_matrix = clean_time(roi_matrix)
+    
+    if len(columns) > 0:
+        covs = pandas.DataFrame(covariates[columns], copy=True)
+    else:
+        covs = pandas.DataFrame(covariates, copy=True)
+    
+    if covs.shape[0] != roi_matrix.shape[0]:
+        raise IOError('length of indices for roi_matrix and covariates must match')
+    else:
+        data = pandas.concat([roi_matrix, covs], axis=1)
+    
+    output = pandas.DataFrame(np.zeros_like(roi_matrix.values),
+                             index = roi_matrix.index,
+                             columns = roi_matrix.columns)
+    
+    if len(norm_index) == 0:
+        for roi in roi_matrix.columns:
+            eq = '%s ~'%roi
+            for i,col in enumerate(covs.columns):
+                if i != len(covs.columns) - 1:
+                    eq += ' %s +'%col
+                else:
+                    eq += ' %s'%col
+            mod = smf.ols(eq, data = data).fit()
+            output.loc[:,roi] = mod.resid
+            if verbose:
+                print('finished',roi)
+    else:
+        for roi in roi_matrix.columns:
+            eq = '%s ~'%roi
+            for i,col in enumerate(covs.columns):
+                if i != len(covs.columns) - 1:
+                    eq += ' %s +'%col
+                else:
+                    eq += ' %s'%col
+            mod = smf.ols(eq, data=data.loc[norm_index]).fit()
+            predicted = mod.predict(data)
+            w_score = (data.loc[:,roi] - predicted) / mod.resid.std()
+            output.loc[:,roi] = w_score
+            if verbose:
+                print('finished',roi)
+    
+    return output
+
+def clean_time(df):
+    
+    df = pandas.DataFrame(df, copy=True)
+    symbols = ['.','-',' ', ':', '/','&']
+    ncols = []
+    for col in df.columns:
+        for symbol in symbols:
+            if symbol in col:
+                col = col.replace(symbol,'_')
+        ncols.append(col)
+    
+    df.columns = ncols
+    
+    return df
+                
 
