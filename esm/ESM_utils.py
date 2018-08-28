@@ -575,6 +575,8 @@ def model_tfm(target_col, norm_col, models, target_distribution, fail_behavior):
                 report.update({'problem': 'False'})
                 tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,1]
             else:
+                report.update({'reversed': np.nan})
+                report.update({'perc. positive': np.nan})
                 report.update({'problem': 'mean of 0s = %s, mean of 1s = %s, perc of 1s = %s'%(
                                                                        d0_mean, d1_mean, numb)})
                 if fail_behavior == 'nan':
