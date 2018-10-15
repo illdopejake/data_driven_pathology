@@ -1,4 +1,11 @@
 
+import os
+import pandas
+import numpy as np
+import nibabel as ni
+from glob import glob
+
+
 # IF RUNNING THIS FROM THE COMMAND-LINE (i.e. not directly from an interpreter), 
 # UN-COMMENT THE FOLLOWING LINES AND FILL IN THE VARIABLES. (SEE DOCUMENTATION
 # BELOW)
