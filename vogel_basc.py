@@ -19,7 +19,7 @@
 #NeuroImage, Volume 51, Issue 3, 2010, Pages 1126-1139, ISSN 1053-8119,
 #http://dx.doi.org/10.1016/j.neuroimage.2010.02.082.
 
-#2) As this material is not ready for full public use, and use of this  script
+#2) As this material is not ready for full public use, and use of this script
 #and other contained in this repo must involve direct collaboration and express
 #permission from Mr. Vogel. That is, direct communication should be made with 
 # Mr. Vogel if this code is used, and details of the collaboration must have
@@ -53,17 +53,30 @@ from sklearn import cluster
 import itertools
 
 def poormans_basc(in_mtx,n_clust,n_iter,checker,
+                  bootstrap = False,
                   inner_cluster_object = None,
-                  return_mtx = False, plotit = True):
+                  connect = False, neighbors = 20,
+                  plotit = True):
     
-    clust_mtx = pandas.DataFrame(index=in_mtx.index)
+    clust_mtx = pandas.DataFrame(index=in_mtx.index, copy=True)
     print('running cluster analyses')
     if type(inner_cluster_object) == type(None):
-        inner_cluster_object = cluster.KMeans(n_clust)
+        inner_cluster_object = cluster.KMeans()
     for i in range(n_iter):
+        tmp_mtx = pandas.DataFrame(in_mtx,copy=True)
         if i%checker == 0:
             print('working on iteration',i)
-        clust_mtx.ix[:,'i%s'%i] = inner_cluster_object.fit(in_mtx).labels_
+        if bootstrap:
+            new_ind = np.random.choice(in_mtx.columns,len(in_mtx.columns))
+            tmp_mtx = tmp_mtx[new_ind]
+        if connect:
+            connectivity = kneighbors_graph(tmp_mtx, n_neighbors=neighbors, 
+                                            include_self=False)
+            nlabs = cluster.AgglomerativeClustering(n_clust,connectivity=connectivity
+                                              ).fit(tmp_mtx).labels_
+            clust_mtx.loc[:,'i%s'%i] = nlabs
+        else:
+            clust_mtx.loc[:,'i%s'%i] = inner_cluster_object.fit(tmp_mtx).labels_
     print('creating stability matrix')
     id_mtx = np.zeros((len(clust_mtx),len(clust_mtx)))
     for i in range(n_iter):
@@ -80,15 +93,17 @@ def poormans_basc(in_mtx,n_clust,n_iter,checker,
     
     if plotit:
         plt.close()
-        sns.clustermap(stab_mtx)
+        sns.clustermap(stab_mtx, cmap = 'RdBu_r')
         plt.show()
     
-    aggclust = cluster.AgglomerativeClustering(n_clust,connectivity=stab_mtx).fit(stab_mtx)
-    if not return_mtx:
-        return aggclust.labels_, stab_mtx
-    else:
-        newdf = pandas.DataFrame(in_mtx, copy=True)
-        newdf.ix[:,'order'] = aggclust.labels_
+    connectivity = kneighbors_graph(stab_mtx, n_neighbors=neighbors, include_self=False)
+    aggclust = cluster.AgglomerativeClustering(n_clust,connectivity=connectivity
+                                              ).fit(stab_mtx)
     
-        return stab_mtx, newdf
+    newdf = pandas.DataFrame(in_mtx, copy=True)
+    newdf.loc[:,'order'] = aggclust.labels_
+    output = {'cluster_object': aggclust, 'stability': stab_mtx,
+              'dataframe': newdf, 'labels': aggclust.labels_}
+    
+    return output
     
