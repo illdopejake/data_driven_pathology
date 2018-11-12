@@ -50,6 +50,7 @@ import os
 from glob import glob
 import nibabel as ni
 from sklearn import cluster
+from sklearn.neighbors import kneighbors_graph
 import itertools
 
 def poormans_basc(in_mtx,n_clust,n_iter,checker,
