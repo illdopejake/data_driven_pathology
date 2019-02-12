@@ -1102,15 +1102,15 @@ def Plot_Individual(matrix, index, style='ROI', label = None):
     if style not in ['ROI', 'subject']:
         raise IOError('style argument must be set to "ROI" or "subject"')
     
-    if 'model_solutions' not in matrix.keys():
-        matrix.update({'model_solutions': matrix['model_solutions0']})
+    if 'Final_solutions' not in matrix.keys():
+        matrix.update({'Final_solutions': matrix['model_solutions0']})
     
     if style == 'ROI':
         x = matrix['ref_pattern'][index,:]
-        y = matrix['model_solutions'][index,:]
+        y = matrix['Final_solutions'][index,:]
     else: # subject
         x = matrix['ref_pattern'][:,index]
-        y = matrix['model_solutions'][:,index]
+        y = matrix['Final_solutions'][:,index]
     
     plt.close()
     sns.regplot(x,y)
