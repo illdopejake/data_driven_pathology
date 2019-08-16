@@ -9,10 +9,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 from scipy.io import savemat,loadmat
+from nilearn import input_data, image
 from matplotlib import mlab
+from sklearn.utils import resample
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import MinMaxScaler
 from statsmodels.sandbox.stats.multicomp import multipletests
+import matlab.engine
+import sys
+
+eng = matlab.engine.start_matlab()
+eng.addpath('../',nargout=0)
 
 def Extract_Values_from_Atlas(files_in, atlas, 
                               mask = None, mask_threshold = 0,
@@ -384,7 +391,6 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
     report details which model was selected for each ROI and notes any problems.
     
     roi_matrix -- A subject x ROI matrix. can be pandas Dataframe or numpy array
-    
     norm_matrix -- A matrix with the same ROIs as roi_matrix. This sample will
     be used to fit the distributions used to calculate the probabilities of
     subject in roi_matrix. Norm_matrix and roi_matrix can have overlapping
@@ -659,7 +665,7 @@ def Evaluate_Model(roi, models, bins=None):
         plt.show()
 
 def Plot_Probabilites(prob_matrix, col_order = [], ind_order = [], 
-					  vmin=None, vmax=None, figsize=()):
+					  vmin=None, vmax=None, figsize=(), cmap=None, ax=None):
     '''
     Given the output matrix of Convert_ROI_values_to_Probabilities, will plot
     a heatmap of all probability values sorted in such a manner to demonstrate
@@ -690,7 +696,7 @@ def Plot_Probabilites(prob_matrix, col_order = [], ind_order = [],
     	col_order = sorter2.sort_values('mean',axis=1,ascending=False).columns
     fig, ax = plt.subplots(figsize=figsize) 
     forplot = prob_matrix.loc[ind_order, col_order]
-    sns.heatmap(forplot, vmin, vmax)
+    sns.heatmap(forplot, vmin, vmax, cmap=cmap, ax=ax)
     plt.xlabel('Regions (highest - lowest p)')
     plt.ylabel('Subjects (lowest - highest p)')
     plt.show()
@@ -812,34 +818,34 @@ def Evaluate_Probabilities(prob_matrix, to_test, alpha_threshold = 0.05, FDR=Non
                   
     return ps
 
-def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name, 
-                           conn_matrices = [], conn_mat_names = [], 
+def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
+                           conn_matrices = [], conn_mat_names = [],
                            conn_out_names = [], figure = True):
     '''
-    This script will convert data into a matfile compatible with 
+    This script will convert data into a matfile compatible with
     running the ESM, and will print outputs to be entered into
     ESM launcher script. The script will also adjust connectomes
     to accomodate missing (masked) ROIs.
-    
-    prob_matrices -- a dict object matching string labels to 
-    probability matrices (pandas DataFrames). These will be 
-    converted into a matlab structure. Columns with all 0s will be 
+
+    prob_matrices -- a dict object matching string labels to
+    probability matrices (pandas DataFrames). These will be
+    converted into a matlab structure. Columns with all 0s will be
     removed automatically.
-        NOTE: All prob_matrices should the same shape, and a 
+        NOTE: All prob_matrices should the same shape, and a
         matching number of non-zero columns. If they do not, run the
         script separately for these matrices.
-    
+
     ages -- an array the same length of prob_matrices that contains
     the age of each subject.
-    
+
     output_dir -- an existing directory where all outputs will be
     written to
-    
+
     file_name -- the name of the output matfile. Do not include a
     file extension
-    
+
     conn_matrices -- a list of paths to matfiles or csvs containing
-    connectomes that match the atlas used to intially extract data. 
+    connectomes that match the atlas used to intially extract data.
     if your probability matrix does not have columns with 0s
     (because, for example, you used a mask), this argument can be
     left unchanged. Otherwise, the script will chop up the
@@ -847,15 +853,15 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
     in the probability matrices.
         NOTE: passing this argument requires passing an argument for
         conn_out_names
-        
-    con_mat_names -- a list the same length of conn_matrices that 
+
+    con_mat_names -- a list the same length of conn_matrices that
     contains string labels
-    
+
     '''
 
     if type(prob_matrices) != dict:
         raise IOError('prob_matrices must be a dict object')
-    
+
     col_lens = []
     for lab, df in prob_matrices.items():
         good_cols = [y for y in df.columns if not all([x==0 for x in df[y]])]
@@ -863,9 +869,9 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
         prob_matrices.update({lab: df[good_cols].values.T})
     if not all([x == col_lens[0] for x in col_lens]):
         raise IOError('all probability matrices entered must have the same # of non-zero columns')
-    
+
     goodcols = [y for y in range(len(df.columns)) if not all([x==0 for x in df[df.columns[y]]])]
-    
+
     if len(conn_matrices) > 0:
         if not len(conn_matrices) == len(conn_out_names):
             raise ValueError('equal length lists must be passed for conn_matrices and out_names')
@@ -887,9 +893,10 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
                 jnk = loadmat(mtx)
                 connmat = jnk[conn_mat_names[i]]
             newmat = np.array([thing[goodcols] for thing in connmat[goodcols]])
+            prob_matrices.update({conn_out_names[i]: newmat})
             jnk[file_name] = newmat
             savemat(os.path.join(output_dir,conn_out_names[i]), jnk)
-            print('new connecitity matrix size: for %s'%conn_out_names[i],newmat.shape)
+            print('new connectivity matrix size: for %s'%conn_out_names[i],newmat.shape)
             if figure:
                 plt.close()
                 try:
@@ -913,7 +920,7 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
     if len(conn_matrices) > 0:
         print('===connectivity matrices===')
         for i in range(len(conn_matrices)):
-            print(os.path.join(output_dir,conn_out_names[i]), conn_out_names[i])
+            print(os.path.join(output_dir,conn_out_names[i]) + '.mat')
 
 def Evaluate_ESM_Results(results, sids, save=True, 
                          labels = None, lit = False, plot = True):
@@ -1004,7 +1011,7 @@ def Evaluate_ESM_Results(results, sids, save=True,
             # other
             res.loc[:, 'ref_age'] = mat['AGEs'].flatten()
             res.loc[:, 'times'] = mat['model_times0'].flatten()
-            #res.loc[:, 'Onset_age'] = mat['ONSETS_est'].flatten()
+            res.loc[:, 'Onset_age'] = mat['ONSETS_est'].flatten()
 
         print('average r2 = ', res.model_r2.mean())
         print('average RMSE =', res.model_RMSE.mean())
@@ -1031,8 +1038,8 @@ def Plot_ESM_results(mat, labels, subids, lit):
     # regional accuracy across subjects
     plt.close()
     sns.regplot(mat['ref_pattern'].mean(1), mat['model_solutions0'].mean(1))
-    plt.xlabel('Avg ROI tau Probability Across Subjects')
-    plt.ylabel('Avg Predicted ROI tau Probability Across Subjects')
+    plt.xlabel('Avg ROI Amyloid Probability Across Subjects')
+    plt.ylabel('Avg Predicted ROI Amyloid Probability Across Subjects')
     plt.title('Regional accuracy across subjects')
     plt.show()
     r,p = stats.pearsonr(mat['ref_pattern'].mean(1), mat['model_solutions0'].mean(1))
@@ -1064,7 +1071,7 @@ def Plot_ESM_results(mat, labels, subids, lit):
     g.fig.set_size_inches((14,6))
     plt.title('ROI values across subjects')
     plt.show()
-    print(roi_test.r2.mean(),'\n')
+    print(roi_test.r2.mean())
     sheets.update({'ROI_acc': roi_test})
     
     # average subjects across ROIs
@@ -1120,10 +1127,10 @@ def Plot_Individual(matrix, index, style='ROI', label = None):
         plt.title(label)
     plt.show()
 
-def Prepare_PET_Data(files_in, atlas, ref = None, msk = None, dimension_reduction = False,
+def Prepare_PET_Data(files_in, atlases, ref = None, msk = None, dimension_reduction = False,
                      ECDF_in = None, output_type = 'py', out_dir = './', out_name = 'PET_data', 
                      save_matrix = False, save_ECDF = False, save_images = False, ref_index = [],
-                    mx_model = 0, orig_atlas = None):
+                    mx_model = 0, orig_atlas = None, esm2014method_py = False, orig_prob_method_matlab = False):
     ''' This is a function that will take several PET images and an atlas and will
     return a subject X region matrix. If specified, the function will also calculate 
     probabilities (via ECDF) either voxelwise, or using a specified reference region
@@ -1134,7 +1141,9 @@ def Prepare_PET_Data(files_in, atlas, ref = None, msk = None, dimension_reductio
         - a list of subject paths OR
         - a subject X image matrix
         
-    altas = a path to a labeled regional atlas in the same space as the PET data
+    atlas = multiple options:
+        - a path to a labeled regional atlas in the same space as the PET data
+        - if analysis was done in native space, a path to a list of labeled regional atlases
     
     ref = multiple options:
         - If None, no probabilities will be calculated, and script will simply extract
@@ -1142,13 +1151,16 @@ def Prepare_PET_Data(files_in, atlas, ref = None, msk = None, dimension_reductio
         - If a path to a reference region mask, will calculate voxelwise probabilities
         based on values within the reference region. Mask must be in the same space as 
         as PET data and atlas
+        - List of paths to reference region masks in native space. Voxelwise probabilities
+        will be calculated based on values within the reference region.
         - If a list of integers, will combine these atlas labels with these integers to 
         make reference region 
         - if 'voxelwise', voxelwise (or atom-wise from dimension reduction) probabilities
         will be estimated. In other words, each voxel or atom will use serve as its own
         reference.
         
-    msk = A path to a binary mask file in the same space as PET data and atlas. If None,
+    msk = multiple options:
+        - A path to a binary mask file in the same space as PET data and atlas. If None,
         mask will be computed as a binary mask of the atlas.
         ** PLEASE NOTE: The mask will be used to mask the reference region! **
     
@@ -1192,68 +1204,228 @@ def Prepare_PET_Data(files_in, atlas, ref = None, msk = None, dimension_reductio
     print('initiating...')
     if output_type != 'py' and output_type != 'mat':
         raise IOError('output_type must be set to py or mat')
-    
-    
+
     # Initialize variables
     
     # Load data
     print('loading data...')
-    i4d = load_data_old(files_in) # load PET data
+    i4d = load_data(files_in, return_images=False) # load PET data
     if save_matrix == 'save':
         otpt = os.path.join(out_dir,'%s_4d_data'%out_name)
         print('saving 4d subject x scan to nifti image: \n',otpt)
         i4d.to_filename(otpt)
     
     # load atlas
-    atlas = ni.load(atlas).get_data().astype(int)
-    if orig_atlas == True:
-        orig_atlas = np.array(atlas, copy=True)
-    if atlas.shape != i4d.shape[:3]:
-        raise ValueError('atlas dimensions do not match PET data dimensions')
+    if type(atlases) != list:
+        if type(atlases) == str:
+            try:
+                atlas = ni.load(atlases).get_data().astype(int)
+            except:
+                raise IOError('could not find an atlas at the specified location: %s'%atlas)
+            if orig_atlas == True:
+                orig_atlas = np.array(atlas, copy=True)
+            if atlas.shape != i4d.shape[:3]:
+                raise ValueError('atlas dimensions do not match PET data dimensions')
     
-    # load reference region
-    if type(ref) == str and ref != 'voxelwise': 
-        print('looking for reference image...')
-        if not os.path.isdir(ref):
-            raise IOError('Please enter a valid path for ref, or select a different option for this argument')
+        # load reference region
+        if type(ref) == str and ref != 'voxelwise':
+            print('looking for reference image...')
+            if not os.path.isdir(ref):
+                raise IOError('Please enter a valid path for ref, or select a different option for this argument')
+            else:
+                ref_msk = ni.load(ref).get_data()
+                if ref_msk.shape != i4d.shape[:3]:
+                    raise ValueError('ref region image dimensions do not match PET data dimensions')
+        elif type(ref) == list:
+            ref_msk = np.zeros_like(atlas)
+            for i in ref:
+                ref_msk[atlas == i] = 1
         else:
-            ref_msk = ni.load(ref).get_data()
-            if ref_msk.shape != i4d.shape[:3]:
-                raise ValueError('ref region image dimensions do not match PET data dimensions')
-    elif type(ref) == list:
-        ref_msk = np.zeros_like(atlas)
-        for i in ref:
-            ref_msk[atlas == i] = 1
+            ref_msk = None
+
+        # Mask data
+        print('masking data...')
+        if msk == None:
+            img_mask = np.array(atlas,copy=True)
+            img_mask[img_mask<1] = 0
+            img_mask[img_mask>0] = 1
+        else:
+            img_mask = ni.load(msk).get_data()
+            atlas[img_mask < 1] = 0
+
+        if type(ref_msk) != type(None):
+            ref_msk[img_mask < 1] = 0
+
+        mask_tfm = input_data.NiftiMasker(ni.Nifti1Image(img_mask,i4d.affine))
+        mi4d = mask_tfm.fit_transform(i4d)
+
+        # dimension reduction (IN BETA!)
+        if dimension_reduction:
+            print('reducing dimensions...')
+            shape = img_mask.shape
+            connectivity = grid_to_graph(n_x=shape[0], n_y=shape[1],
+                                       n_z=shape[2], mask=img_mask)
+        # main ECDF calculation (or mixture model calc)
+        skip = False
+        if ref != 'voxelwise':
+            if type(ECDF_in) != type(None):
+                print('generating ECDF...')
+                print('using user-supplied data...')
+                if type(ECDF_in) == ed.ECDF:
+                    mi4d_ecdf, ecref = ecdf_simple(mi4d, ECDF_in, mx=mx_model)
+                    input_distribution = 'not generated'
+                elif type(ECDF_in) == np.ndarray:
+                    mi4d_ecdf, ecref = ecdf_simple(mi4d, ECDF_in, mx=mx_model)
+                    input_distribution = ECDF_in
+        #       elif # add later an option for importing an external object
+                else:
+                    try:
+                        mi4d_ecdf, ecref = ecdf_simple(mi4d, ECDF_in, mx=mx_model)
+                        print('Could not understand ECDF input, but ECDF successful')
+                        input_distribution = 'not generated'
+                    except:
+                        raise IOError(
+                                'Invalid argument for ECDF in. Please enter an ndarray, an ECDF object, or a valid path')
+            else:
+                if type(ref_msk) != type(None):
+                    print('generating ECDF...')
+                    ref_tfm = input_data.NiftiMasker(ni.Nifti1Image(ref_msk,i4d.affine))
+                    refz = ref_tfm.fit_transform(i4d)
+                    mi4d_ecdf, ecref = ecdf_simple(mi4d, refz, mx=mx_model)
+                    input_distribution = refz.flat
+                else:
+                    print('skipping ECDF...')
+                    skip = True
+
+        else:
+            print('generating voxelwise ECDF...')
+            mi4d_ecdf, ECDF_array = ecdf_voxelwise(mi4d, ref_index, save_ECDF, mx=mx_model)
+            input_distribution = 'not generated'
+
+        if not skip:
+    #       if save_ECDF:
+    #           create an array and somehow write it to a file
+
+        # transform back to image-space
+            print('transforming back into image space')
+            f_images = mask_tfm.inverse_transform(mi4d_ecdf)
+
+        else:
+            #if type(ECDF):
+            print('transforming back into image space')
+            f_images = mask_tfm.inverse_transform(mi4d)
+
+        # generate output matrix
+        print('generating final subject x region matrix')
+        if type(orig_atlas) == type(None):
+            f_mat = generate_matrix_from_atlas_old(f_images, atlas)
+        else:
+            f_mat = generate_matrix_from_atlas_old(f_images, orig_atlas)
+
     else:
-        ref_msk = None
-    
-    
-    # Mask data
-    print('masking data...')
-    if msk == None:
-        img_mask = np.array(atlas,copy=True)
-        img_mask[img_mask<1] = 0
-        img_mask[img_mask>0] = 1
+        if len(atlases) != len(files_in):
+            raise IOError('number of images (%s) does not match number of atlases (%s)'%(len(files_in),
+                                                                                   len(atlases)))
+        type_ref_int = True
+        if isinstance(ref, list):
+            if all(isinstance(x, int) for x in ref):
+                print("Passing in a list of integers to specify the reference region.")
+            elif all(isinstance(x, str) for x in ref):
+                if len(ref) == len(files_in):
+                    type_ref_int = False
+                    print("Passing in a list of paths to reference region masks in native space")
+                else:
+                    raise IOError(
+                    'number of images (%s) does not match number of ref region masks (%s)' % len(files_in),
+                    len(ref))
+        catch = []
+        for i in range(0, len(files_in)):
+            print(files_in[i])
+            i4d = ni.load(files_in[i])
+            atlas = ni.load(atlases[i]).get_data()
+            if len(atlas.shape) == 4:
+                atlas = np.reshape(atlas, atlas.shape[:3])
+            if atlas.shape != i4d.shape[:3]:
+                raise ValueError('atlas dimensions do not match PET data dimensions')
+            if type_ref_int:
+                ref_msk = np.zeros_like(atlas)
+                for i in ref:
+                    ref_msk[atlas == i] = 1
+            else:
+                ref_msk = ni.load(ref[i]).get_data()
+                if len(ref_msk.shape) == 4:
+                    ref_msk = np.reshape(ref_msk, ref_msk.shape[:3])
+                    if ref_msk.shape != i4d.shape[:3]:
+                        raise ValueError('ref region image dimensions do not match PET data dimensions')
+            if type(ref_msk) != type(None):
+                ref_msk[ref_msk < 1] = 0
+                ref_msk[ref_msk > 0] = 1
+            # Mask data
+            if msk == None:
+                img_mask = np.array(atlas, copy=True)
+                img_mask[img_mask < 1] = 0
+                img_mask[img_mask > 0] = 1
+            else:
+                img_mask = ni.load(msk).get_data()
+                atlas[img_mask < 1] = 0
+
+            mask_tfm = input_data.NiftiMasker(ni.Nifti1Image(img_mask, i4d.affine))
+            mi4d = mask_tfm.fit_transform(i4d)
+
+            #Calculate voxelwise ECDF with respect to ref region in native space
+            skip = False
+            if type(ECDF_in) == type(None):
+                if type(ref_msk) != type(None):
+                    print('generating ECDF...')
+                    ref_tfm = input_data.NiftiMasker(ni.Nifti1Image(ref_msk, i4d.affine))
+                    refz = ref_tfm.fit_transform(i4d)
+                    if esm2014method_py:
+                        mi4d_ecdf, ecref = ecdf_voxelwise_bootstrapped_maxvalues_refregion(mi4d, refz)
+                    elif orig_prob_method_matlab:
+                        mi4d_ecdf = ecdf_voxelwise_bootstrapped_yasser2016(mi4d, refz)
+                    else:
+                        mi4d_ecdf, ecref = ecdf_simple(mi4d, refz, mx=mx_model)
+                        input_distribution = refz.flat
+                else:
+                    print('skipping ECDF...')
+                    skip = True
+            if not skip:
+                print('transforming back into image space')
+                f_images = mask_tfm.inverse_transform(mi4d_ecdf)
+            else:
+                # if type(ECDF):
+                print('transforming back into image space')
+                f_images = mask_tfm.inverse_transform(mi4d)
+            # generate output matrix
+            print('generating final subject x region matrix')
+            if type(orig_atlas) == type(None):
+                f_mat_single = generate_matrix_from_atlas_old(f_images, atlas)
+            else:
+                f_mat_single = generate_matrix_from_atlas_old(f_images, orig_atlas)
+            #f_mat_single = ecdf_main(mi4d=mi4d, i4d=i4d, atlas=atlas, ref=ref, mask_tfm = mask_tfm)
+            catch.append(f_mat_single)
+        f_mat = pandas.concat(catch)
+    print('preparing outputs')
+    output = {}
+    if output_type == 'py':
+        f_mat.to_csv(os.path.join(out_dir, '%s_roi_data.csv' % out_name), index=False)
+        output.update({'roi_matrix': f_mat})
     else:
-        img_mask = ni.load(msk).get_data()
-        atlas[img_mask < 1] = 0
-    
-    if type(ref_msk) != type(None):
-        ref_msk[img_mask < 1] = 0
-    
-    mask_tfm = input_data.NiftiMasker(ni.Nifti1Image(img_mask,i4d.affine))
-    mi4d = mask_tfm.fit_transform(i4d)
-    
-    # dimension reduction (IN BETA!)
-    if dimension_reduction:
-        print('reducing dimensions...')
-        shape = img_mask.shape
-        connectivity = grid_to_graph(n_x=shape[0], n_y=shape[1],
-                                   n_z=shape[2], mask=img_mask)
-    # main ECDF calculation (or mixture model calc)
-    skip = False
+        output.update({'roi_matrix': f_mat.values})
+        output.update({'roi_matrix_columns': f_mat.columns})
+    if save_matrix == 'return':
+        output.update({'4d_image_matrix': i4d})
+    if save_ECDF == 'return':
+        if output_type == 'py':
+            output.update({'ECDF_function': ECDF_array})
+        else:
+            output.update({'input_distribution': input_distribution})
+        return output
+
+def ecdf_main(mi4d, i4d, atlas, ref, mask_tfm, mx_model=0, ref_msk=None, save_ECDF=False, ECDF_in=None, ref_index=[],
+              skip=False, orig_atlas=None):
     if ref != 'voxelwise':
-        if type(ECDF_in) != type(None): 
+        if type(ECDF_in) != type(None):
             print('generating ECDF...')
             print('using user-supplied data...')
             if type(ECDF_in) == ed.ECDF:
@@ -1262,7 +1434,7 @@ def Prepare_PET_Data(files_in, atlas, ref = None, msk = None, dimension_reductio
             elif type(ECDF_in) == np.ndarray:
                 mi4d_ecdf, ecref = ecdf_simple(mi4d, ECDF_in, mx=mx_model)
                 input_distribution = ECDF_in
-    #       elif # add later an option for importing an external object 
+    #       elif # add later an option for importing an external object
             else:
                 try:
                     mi4d_ecdf, ecref = ecdf_simple(mi4d, ECDF_in, mx=mx_model)
@@ -1281,53 +1453,38 @@ def Prepare_PET_Data(files_in, atlas, ref = None, msk = None, dimension_reductio
             else:
                 print('skipping ECDF...')
                 skip = True
-    
+
     else:
         print('generating voxelwise ECDF...')
         mi4d_ecdf, ECDF_array = ecdf_voxelwise(mi4d, ref_index, save_ECDF, mx=mx_model)
         input_distribution = 'not generated'
-        
+
     if not skip:
 #       if save_ECDF:
 #           create an array and somehow write it to a file
-        
+
     # transform back to image-space
         print('transforming back into image space')
         f_images = mask_tfm.inverse_transform(mi4d_ecdf)
-    
+
     else:
         #if type(ECDF):
         print('transforming back into image space')
         f_images = mask_tfm.inverse_transform(mi4d)
-    
+
     # generate output matrix
     print('generating final subject x region matrix')
     if type(orig_atlas) == type(None):
         f_mat = generate_matrix_from_atlas_old(f_images, atlas)
     else:
         f_mat = generate_matrix_from_atlas_old(f_images, orig_atlas)
-    
-    # compile (and save) outputs
-    print('preparing outputs')
-    output = {}
-    if output_type == 'py':
-        f_mat.to_csv(os.path.join(out_dir, '%s_roi_data.csv'%out_name),index=False)
-        output.update({'roi_matrix': f_mat})
-    else:
-        output.update({'roi_matrix': fmat.values})
-        output.update({'roi_matrix_columns': fmat.columns})
-    if save_matrix == 'return':
-        output.update({'4d_image_matrix': i4d})
-    if save_ECDF == 'return':
-        if output_type == 'py':
-            output.update({'ECDF_function': ECDF_array})
-        else:
-            output.update({'input_distribution': input_distribution})
-    
+    return f_mat
+
+
 def load_data_old(files_in):
-    
+
     fail = False
-    
+
     if type(files_in) == str:
         if os.path.isdir(files_in):
             print('It seems you passed a directory')
@@ -1375,6 +1532,22 @@ def dim_reduction(mi4d, connectivity, dimension_reduction):
 
     return mi4d
 
+def ecdf_voxelwise_bootstrapped_yasser2016(mi4d, refz):
+    mi4d_ecdf = eng.voxelwise_pet_prob_yasser2016(matlab.double([list(mi4d[0])]), matlab.double([list(refz[0])]))
+    return mi4d_ecdf
+
+def ecdf_voxelwise_bootstrapped_maxvalues_refregion(mi4d, refz):
+    refz_max_values = []
+    for i in range(0, 40000):
+        resampled_refz = resample(refz.flatten(), n_samples=500, replace=True)
+        percentile_value = np.percentile(resampled_refz, 95)
+        refz_max_values.append(percentile_value)
+    refz_max_array = np.array(refz_max_values)
+    refz_max_array = np.reshape(refz_max_array, (1, len(refz_max_array)))
+    mi4d_ecdf, ecref = ecdf_simple(mi4d, refz_max_array, mx=0)
+    return mi4d_ecdf, ecref
+
+
 def ecdf_simple(mi4d, refz, mx=0):
 
     if type(refz) == ed.ECDF:
@@ -1412,7 +1585,7 @@ def ecdf_voxelwise(mi4d, ref_index, save_ECDF, mx=0):
             if mx == 0:
                 ECDF_array = np.array([ed.ECDF(mi4d[:,x]) for x in range(y)]).transpose()
                 print('transforming data...')
-                mi4d_ecdf = np.array([ECDF_matrix[x](mi4d[:,x]) for x in range(y)]
+                mi4d_ecdf = np.array([ECDF_array[x](mi4d[:,x]) for x in range(y)]
                                          ).transpose()
             else:
                 raise IOError('at this stage, cant save mixture model info....sorry...')
@@ -1429,7 +1602,7 @@ def ecdf_voxelwise(mi4d, ref_index, save_ECDF, mx=0):
             else:
                 ECDF_array = [ed.ECDF(mi4d[ref_index,x]) for x in range(y)]
                 print('transforming data...')
-                mi4d_ecdf = ecdf_voxelwise = np.array([ECDF_matrix[x](mi4d[good_ind,x]) for x in range(y)]
+                mi4d_ecdf = np.array([ECDF_array[x](mi4d[good_ind,x]) for x in range(y)]
                                          ).transpose()
         else:
             ### COMING SOON!
@@ -1444,13 +1617,20 @@ def generate_matrix_from_atlas_old(files_in, atlas):
     f_mat = pandas.DataFrame(index = range(files_in.shape[-1]),
                              columns = ['roi_%s'%x for x in np.unique(atlas) if x != 0])
     tot = np.bincount(atlas.flat)
+    sorted_cols = []
     for sub in range(files_in.shape[-1]):
         mtx = files_in[:,:,:,sub]
         sums = np.bincount(atlas.flat, weights = mtx.flat)
         rois = (sums/tot)[1:]
-        f_mat.loc[f_mat.index[sub]] = rois
-        
-    return f_mat
+        for i in range(0, len(rois)):
+            col="roi_" + str(i+1)
+            sorted_cols.append(col)
+            if col in list(f_mat.columns):
+                f_mat.loc[f_mat.index[sub], col] = rois[i]
+            else:
+                f_mat.loc[f_mat.index[sub], col] = 0
+    f_mat = f_mat[sorted_cols]   
+    return f_mat    
 
 
 def W_Transform(roi_matrix, covariates, norm_index = [], 
