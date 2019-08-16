@@ -7,6 +7,7 @@ from glob import glob
 import statsmodels.distributions.empirical_distribution as ed
 import matplotlib.pyplot as plt
 import seaborn as sns
+import statsmodels.formula.api as smf
 from scipy import stats
 from scipy.io import savemat,loadmat
 from nilearn import input_data, image
