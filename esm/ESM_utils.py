@@ -16,11 +16,11 @@ from sklearn.utils import resample
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import MinMaxScaler
 from statsmodels.sandbox.stats.multicomp import multipletests
-import matlab.engine
+#import matlab.engine
 import sys
 
-eng = matlab.engine.start_matlab()
-eng.addpath('../',nargout=0)
+#eng = matlab.engine.start_matlab()
+#eng.addpath('../',nargout=0)
 
 def Extract_Values_from_Atlas(files_in, atlas, 
                               mask = None, mask_threshold = 0,
@@ -1020,7 +1020,7 @@ def Evaluate_ESM_Results(results, sids, save=True,
             res.loc[:, 'sigma'] = mat['model_parameters0'][2,:].flatten()
 
             # other
-            res.loc[:, 'ref_age'] = mat['AGEs'].flatten()
+            #res.loc[:, 'ref_age'] = mat['AGEs'].flatten()
             res.loc[:, 'times'] = mat['model_times0'].flatten()
             res.loc[:, 'Onset_age'] = mat['ONSETS_est'].flatten()
 

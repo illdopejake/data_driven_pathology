@@ -29,9 +29,10 @@ def evaluate_components(clf, x, y, n_iterations=500, check = 100,
     
     k = clf.n_components
     # permute and refit model
+    x.index = range(len(x.index))
     for i in range(n_iterations):
         new_ind = np.random.permutation(x.index)
-        new_x = x.loc[new_ind]
+        new_x = x.iloc[new_ind]
         newmod = clf.fit(new_x,y)
         new_scores = [stats.pearsonr(newmod.x_scores_[:,x], newmod.y_scores_[:,x]
                                  )[0]**2 for x in range(n_comps)]
