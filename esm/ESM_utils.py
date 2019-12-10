@@ -20,7 +20,7 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 import sys
 
 #eng = matlab.engine.start_matlab()
-#eng.addpath('../',nargout=0)
+#eng.addpath('/home/users/jvogel/git/data_driven_pathology/esm/',nargout=0)
 
 def Extract_Values_from_Atlas(files_in, atlas, 
                               mask = None, mask_threshold = 0,
@@ -424,8 +424,9 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
     are not consistent with the hypothesis presented in target_distribution.
     This argument tells the script what to do in such situations:
         'nan' will return NaNs for all ROIs that fail
-        'values' will return probability values from one the distributions (selected
-        arbitrarily)
+        'left' will return probability values from the expected distribution
+        'right' will return probability values from the unexpected distribution
+        'guess' will use the proportions and target_distribution to make a best guess
         
     mixed_probability -- Experimental setting. If set to True, after calculating
     probabilities, for rois with n_components > 1 only, will set all values < 
@@ -440,7 +441,7 @@ def Convert_ROI_values_to_Probabilities(roi_matrix, norm_matrix = None,
     if target_distribution not in ['left','right']:
         raise IOError('target_distribution must be set to "left", "right" or None')
     
-    if fail_behavior not in ['nan', 'values']:
+    if fail_behavior not in ['nan', 'left','right','guess']:
         raise IOError('fail_behavior must be set to "nan" or "values"')
     
     if type(roi_matrix) == pandas.core.frame.DataFrame:
@@ -567,8 +568,16 @@ def model_tfm(target_col, norm_col, models, target_distribution, fail_behavior):
                                                                        d0_mean, d1_mean, numb)})
                 if fail_behavior == 'nan':
                     tfm = [np.nan for x in range(len(target_col))]
-                elif fail_behavior == 'values':
+                elif fail_behavior == 'right':
                     tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,1]
+                elif fail_behavior == 'left':
+                    tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,0]
+                elif fail_behavior == 'guess':
+                    if d0_mean > d1_mean and numb < 0.5:
+                        tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,0]
+                    else:
+                        tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,1]
+
                 
         else:
             if d0_mean < d1_mean and numb < 0.5:
@@ -588,8 +597,16 @@ def model_tfm(target_col, norm_col, models, target_distribution, fail_behavior):
                                                                        d0_mean, d1_mean, numb)})
                 if fail_behavior == 'nan':
                     tfm = [np.nan for x in range(len(target_col))]
-                elif fail_behavior == 'values':
-                    tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,0] 
+                elif fail_behavior == 'left':
+                    tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,0]
+                elif fail_behavior == 'right':
+                    tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,1] 
+                elif fail_behavior == 'guess':
+                    if d0_mean > d1_mean and numb < 0.5:
+                        tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,1]
+                    else:
+                        tfm = fitted.predict_proba(target_col.values.reshape(-1,1))[:,0]
+
                 
                 
     return tfm, report
@@ -702,10 +719,9 @@ def Plot_Probabilites(prob_matrix, col_order = [], ind_order = [],
     g = sns.heatmap(forplot, vmin, vmax, cmap=cmap, ax=ax)
     plt.xlabel('Regions (highest - lowest p)')
     plt.ylabel('Subjects (lowest - highest p)')
-    plt.show()
-
     
     if return_figure:
+        plt.show()
         return g, forplot.columns
     else:
         plt.xlabel('Regions (highest - lowest p)')
@@ -887,7 +903,9 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
         if not len(conn_matrices) == len(conn_out_names):
             raise ValueError('equal length lists must be passed for conn_matrices and out_names')
         for i,mtx in enumerate(conn_matrices):
-            if mtx[-3:] == 'csv':
+            if type(mtx) == np.ndarray:
+                connmat = mtx
+            elif mtx[-3:] == 'csv':
                 connmat = pandas.read_csv(mtx)
                 x,y = connmat.shape
                 if x < y:
@@ -903,6 +921,8 @@ def Prepare_Inputs_for_ESM(prob_matrices, ages, output_dir, file_name,
             elif mtx[-3:] == 'mat':
                 jnk = loadmat(mtx)
                 connmat = jnk[conn_mat_names[i]]
+            else:
+                raise IOError('conn_matrices accepts csvs or matfiles')
             newmat = np.array([thing[goodcols] for thing in connmat[goodcols]])
             prob_matrices.update({conn_out_names[i]: newmat})
             jnk[file_name] = newmat
@@ -979,7 +999,7 @@ def Evaluate_ESM_Results(results, sids, save=True,
             res.loc[:, 'sigma'] = mat['Final_parameters'][2,:].flatten()
 
             # other
-            res.loc[:, 'ref_age'] = mat['AGEs'].flatten()
+            #res.loc[:, 'ref_age'] = mat['AGEs'].flatten()
             res.loc[:, 'times'] = mat['Final_times'].flatten()
             res.loc[:, 'Onset_age'] = mat['ONSETS_est'].flatten()
 
@@ -1051,7 +1071,7 @@ def Plot_ESM_results(mat, labels, subids, lit):
     sns.regplot(mat['ref_pattern'].mean(1), mat['model_solutions0'].mean(1))
     plt.xlabel('Avg ROI Amyloid Probability Across Subjects')
     plt.ylabel('Avg Predicted ROI Amyloid Probability Across Subjects')
-    plt.title('Regional accuracy across subjects')
+    #plt.title('Regional accuracy across subjects')
     plt.show()
     r,p = stats.pearsonr(mat['ref_pattern'].mean(1), mat['model_solutions0'].mean(1))
     print('r2 = ',r**2,'/n')
@@ -1644,7 +1664,7 @@ def generate_matrix_from_atlas_old(files_in, atlas):
     return f_mat    
 
 
-def W_Transform(roi_matrix, covariates, norm_index = [], 
+def W_Transform(roi_matrix, covariates=None, norm_index = [], 
                 columns = [], verbose = False):
     
     '''
@@ -1679,21 +1699,28 @@ def W_Transform(roi_matrix, covariates, norm_index = [],
     
     if type(roi_matrix) != pandas.core.frame.DataFrame:
         raise IOError('roi_matrix must be a subjects x ROIs pandas DataFrame')
-    if type(covariates) != pandas.core.frame.DataFrame:
-        raise IOError('covariates must be a subjects x covariates pandas DataFrame')
+
     
-    covariates = clean_time(covariates)
     roi_matrix = clean_time(roi_matrix)
-    
-    if len(columns) > 0:
-        covs = pandas.DataFrame(covariates[columns], copy=True)
+
+    if type(covariates) != type(None):
+        if type(covariates) != pandas.core.frame.DataFrame:
+            raise IOError('covariates must be a subjects x covariates pandas DataFrame')
+        covariates = clean_time(covariates)
+        if len(columns) > 0:
+            covs = pandas.DataFrame(covariates[columns], copy=True)
+        else:
+            covs = pandas.DataFrame(covariates, copy=True)
+        
+        if covs.shape[0] != roi_matrix.shape[0]:
+            raise IOError('length of indices for roi_matrix and covariates must match')
+        else:
+            data = pandas.concat([roi_matrix, covs], axis=1)
     else:
-        covs = pandas.DataFrame(covariates, copy=True)
-    
-    if covs.shape[0] != roi_matrix.shape[0]:
-        raise IOError('length of indices for roi_matrix and covariates must match')
-    else:
-        data = pandas.concat([roi_matrix, covs], axis=1)
+        if len(columns) > 0:
+            raise IOError('if you pass columns, you will need to pass a covariates matrix')
+        else:
+            data = pandas.DataFrame(roi_matrix, copy=True)
     
     output = pandas.DataFrame(np.zeros_like(roi_matrix.values),
                              index = roi_matrix.index,
@@ -1712,19 +1739,26 @@ def W_Transform(roi_matrix, covariates, norm_index = [],
             if verbose:
                 print('finished',roi)
     else:
-        for roi in roi_matrix.columns:
-            eq = '%s ~'%roi
-            for i,col in enumerate(covs.columns):
-                if i != len(covs.columns) - 1:
-                    eq += ' %s +'%col
-                else:
-                    eq += ' %s'%col
-            mod = smf.ols(eq, data=data.loc[norm_index]).fit()
-            predicted = mod.predict(data)
-            w_score = (data.loc[:,roi] - predicted) / mod.resid.std()
-            output.loc[:,roi] = w_score
-            if verbose:
-                print('finished',roi)
+        if type(covariates) != type(None):
+            for roi in roi_matrix.columns:
+                eq = '%s ~'%roi
+                for i,col in enumerate(covs.columns):
+                    if i != len(covs.columns) - 1:
+                        eq += ' %s +'%col
+                    else:
+                        eq += ' %s'%col
+                mod = smf.ols(eq, data=data.loc[norm_index]).fit()
+                predicted = mod.predict(data)
+                w_score = (data.loc[:,roi] - predicted) / mod.resid.std()
+                output.loc[:,roi] = w_score
+                if verbose:
+                    print('finished',roi)
+        else:
+            for roi in roi_matrix.columns:
+                mn = data.loc[norm_index,roi].mean()
+                std = data.loc[norm_index,roi].std()
+                w_score = (data.loc[:,roi] - mn) / std
+                output.loc[:,roi] = w_score.values
     
     return output
 
