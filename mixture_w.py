@@ -13,7 +13,8 @@ from esm.ESM_utils import model_tfm, W_Transform
 scans = sorted(glob('/data1/users/jvogel/ADNI_tau/template_space/tau_images/*/TAU_PET/template_space/TAU_SUVr_*.nii'))
 # path to a binary image mask
 mask = '/home/users/jvogel/Science/templates/masks/ADNI_GM_mask_1p5mm_nocereb_thr0p9.nii'
-
+# directory to save images
+oudir = '/data1/users/jvogel/ADNI_tau/wtest/'
 
 #### SCRIPT STARTS HERE.
 #### DONT EDIT BELOW THIS LINE UNLESS YOU KNOW WHAT YOURE DOING
@@ -194,6 +195,4 @@ def back_to_4d(i2d, old_shape):
 
 if __name__ == '__main__':
 
-    img_wscore_wrapper(scans,mask,
-                       outdir = None,outnm='TFMd',
-                       save_style='3d')
+    img_wscore_wrapper(scans,mask,outdir,outnm='TFMd', save_style='3d')
