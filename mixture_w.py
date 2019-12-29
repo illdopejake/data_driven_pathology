@@ -7,7 +7,17 @@ from nilearn import image
 from sklearn.mixture import GaussianMixture
 from esm.ESM_utils import model_tfm, W_Transform
 
+#### USER INPUT GOES HERE
 
+# a list of paths to tau-PET scans 
+scans = sorted(glob('/data1/users/jvogel/ADNI_tau/template_space/tau_images/*/TAU_PET/template_space/TAU_SUVr_*.nii'))
+# path to a binary image mask
+mask = '/home/users/jvogel/Science/templates/masks/ADNI_GM_mask_1p5mm_nocereb_thr0p9.nii'
+
+
+#### SCRIPT STARTS HERE.
+#### DONT EDIT BELOW THIS LINE UNLESS YOU KNOW WHAT YOURE DOING
+##################################################################
 def img_wscore_wrapper(scans,mask=None,
                        outdir = None,outnm='TFMd',
                        save_style='3d'):
@@ -181,3 +191,9 @@ def back_to_4d(i2d, old_shape):
         holder.append(mtx)
     i4d = np.concatenate(holder,axis=3)
     return i4d
+
+if __name__ == '__main__':
+
+    img_wscore_wrapper(scans,mask,
+                       outdir = None,outnm='TFMd',
+                       save_style='3d')
