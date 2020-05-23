@@ -3,6 +3,7 @@ import sys
 import pandas
 import numpy as np
 import nibabel as nib
+from glob import glob
 from nilearn import image
 from sklearn.mixture import GaussianMixture
 from esm.ESM_utils import model_tfm, W_Transform
@@ -14,7 +15,7 @@ scans = sorted(glob('/data1/users/jvogel/ADNI_tau/template_space/tau_images/*/TA
 # path to a binary image mask
 mask = '/home/users/jvogel/Science/templates/masks/ADNI_GM_mask_1p5mm_nocereb_thr0p9.nii'
 # directory to save images
-oudir = '/data1/users/jvogel/ADNI_tau/wtest/'
+outdir = '/data1/users/jvogel/ADNI_tau/wtest/'
 
 #### SCRIPT STARTS HERE.
 #### DONT EDIT BELOW THIS LINE UNLESS YOU KNOW WHAT YOURE DOING
@@ -97,7 +98,7 @@ def img_wscore_wrapper(scans,mask=None,
 
     print('reverting back to image format')
     if masked:
-        tfm_4d = mskr.inverse_transform(transformed).values
+        tfm_4d = mskr.inverse_transform(transformed).get_data()
     else:
         tfm_4d = back_to_4d(transformed,old_shape)
     

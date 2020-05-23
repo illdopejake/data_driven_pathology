@@ -6,7 +6,8 @@ import seaborn as sns
 
 
 def evaluate_components(clf, x, y, n_iterations=500, check = 100,
-                       evaluate = True, plot = True, thr = 0.95):
+                       evaluate = True, plot = True, thr = 0.95,
+                       metric=None):
     
     if type(x) != type(pandas.DataFrame()):
         x = pandas.DataFrame(x)
@@ -22,9 +23,12 @@ def evaluate_components(clf, x, y, n_iterations=500, check = 100,
     results.loc[range(n_comps),'model'] = ['True']*n_comps
     results.loc[range(n_comps,n_comps*(n_iterations+1)), 'model'
                ] = ['Null']*(n_comps*n_iterations)
-    
-    true_scores = [stats.pearsonr(clf.x_scores_[:,x], clf.y_scores_[:,x]
-                                 )[0]**2 for x in range(n_comps)]
+    if not metric:
+    	true_scores = [stats.pearsonr(clf.x_scores_[:,x], clf.y_scores_[:,x]
+                                     )[0]**2 for x in range(n_comps)]
+    else:
+        true_scores = [metric(clf.x_scores_[:,x], clf.y_scores_[:,x]
+                             ) for x in range(n_comps)]
     results.loc[results[results.model=='True'].index,'score'] = true_scores
     
     k = clf.n_components
@@ -34,8 +38,12 @@ def evaluate_components(clf, x, y, n_iterations=500, check = 100,
         new_ind = np.random.permutation(x.index)
         new_x = x.iloc[new_ind]
         newmod = clf.fit(new_x,y)
-        new_scores = [stats.pearsonr(newmod.x_scores_[:,x], newmod.y_scores_[:,x]
-                                 )[0]**2 for x in range(n_comps)]
+        if not metric:
+            new_scores = [stats.pearsonr(newmod.x_scores_[:,x], newmod.y_scores_[:,x]
+                                        )[0]**2 for x in range(n_comps)]
+        else:
+            new_scores = [metric(newmod.x_scores_[:,x], newmod.y_scores_[:,x]
+                                ) for x in range(n_comps)]
         results.loc[range(k, k+n_comps), 'score'] = new_scores
         if check:
             if i % check == 0:
@@ -57,7 +65,7 @@ def display_results(results, thr = 0.95, plot=True):
         # plot components
         sns.set_context('paper')
         plt.close()
-        sns.factorplot(x='component', y = 'score', hue='model', data=results)
+        sns.catplot(x='component', y = 'score', hue='model', data=results,kind='point')
         plt.show()
     
     # get p-values
@@ -116,8 +124,17 @@ def bootstrap_features(clf, fit_model, X, y, n_iterations=500, check = 100, on =
             xcorrs = [stats.pearsonr(orig.x_loadings_[:,c],
                                      newmod.x_loadings_[:,x])[0]**2 for x in range(orig.n_components)]
             closest = np.argmax(xcorrs)
-            all_results_x[c].loc[i] = newmod.x_loadings_[:,closest]
-            all_results_y[c].loc[i] = newmod.y_loadings_[:,closest]
+            # account for possible inversion
+            if stats.pearsonr(orig.x_loadings_[:,c],
+                         newmod.x_loadings_[:,closest])[0] < 0:
+                new_loadingsX = newmod.x_loadings_[:,closest] * -1
+                new_loadingsy = newmod.y_loadings_[:,closest] * -1
+            else:
+                new_loadingsX = newmod.x_loadings_[:,closest]
+                new_loadingsy = newmod.y_loadings_[:,closest]
+
+            all_results_x[c].loc[i] = new_loadingsX
+            all_results_y[c].loc[i] = new_loadingsy
         if check:
             if i % check == 0:
                 print('finished iteration',i)
