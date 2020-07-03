@@ -1765,7 +1765,7 @@ def W_Transform(roi_matrix, covariates=None, norm_index = [],
 def clean_time(df):
     
     df = pandas.DataFrame(df, copy=True)
-    symbols = ['.','-',' ', ':', '/','&']
+    symbols = ['.','-',' ', ':', '/','&','+']
     ncols = []
     for col in df.columns:
         for symbol in symbols:
