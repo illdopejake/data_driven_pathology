@@ -716,7 +716,7 @@ def Plot_Probabilites(prob_matrix, col_order = [], ind_order = [],
     fig, ax = plt.subplots(figsize=figsize) 
     forplot = prob_matrix.loc[ind_order, col_order]
 
-    g = sns.heatmap(forplot, vmin, vmax, cmap=cmap, ax=ax)
+    g = sns.heatmap(forplot, vmin=vmin, vmax=vmax, cmap=cmap, ax=ax)
     plt.xlabel('Regions (highest - lowest p)')
     plt.ylabel('Subjects (lowest - highest p)')
     
