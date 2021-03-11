@@ -7,7 +7,7 @@ import seaborn as sns
 
 def evaluate_components(clf, x, y, n_iterations=500, check = 100,
                        evaluate = True, plot = True, thr = 0.95,
-                       metric=None):
+                       metric=None, random_state=123):
     
     if type(x) != type(pandas.DataFrame()):
         x = pandas.DataFrame(x)
@@ -33,13 +33,15 @@ def evaluate_components(clf, x, y, n_iterations=500, check = 100,
     
     k = clf.n_components
     # permute and refit model
+    rs = np.random.RandomState(random_state)
     x.index = range(len(x.index))
     for i in range(n_iterations):
-        new_ind = np.random.permutation(x.index)
+        new_ind = rs.permutation(x.index)
         new_x = x.iloc[new_ind]
         newmod = clf.fit(new_x,y)
         if not metric:
-            new_scores = [stats.pearsonr(newmod.x_scores_[:,x], newmod.y_scores_[:,x]
+            new_scores = [stats.pearsonr(newmod.x_scores_[:,x], 
+                                         newmod.y_scores_[:,x]
                                         )[0]**2 for x in range(n_comps)]
         else:
             new_scores = [metric(newmod.x_scores_[:,x], newmod.y_scores_[:,x]
